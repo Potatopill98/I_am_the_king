@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>《我要当国王》开发复盘手册</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #0f1115;
+    color: #e0e0e0;
+    line-height: 1.7;
+    font-size: 16px;
+    padding: 16px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 24px;
+    color: #4fc3f7;
+    text-align: center;
+    margin-bottom: 8px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #2a2d35;
+  }
+  .subtitle {
+    text-align: center;
+    color: #888;
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+  h2 {
+    font-size: 19px;
+    color: #81c784;
+    margin-top: 28px;
+    margin-bottom: 12px;
+    padding-left: 10px;
+    border-left: 4px solid #81c784;
+  }
+  h3 {
+    font-size: 16px;
+    color: #ffb74d;
+    margin-top: 18px;
+    margin-bottom: 8px;
+  }
+  p { margin-bottom: 10px; }
+  ul, ol { margin-left: 20px; margin-bottom: 12px; }
+  li { margin-bottom: 4px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid #333;
+    padding: 6px 8px;
+    text-align: left;
+  }
+  th { background: #1e2128; color: #4fc3f7; }
+  tr:nth-child(even) { background: #16181d; }
+  code {
+    background: #1e2128;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "Consolas", "Monaco", monospace;
+    font-size: 13px;
+    color: #f0a0a0;
+  }
+  pre {
+    background: #16181d;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 12px;
+    overflow-x: auto;
+    margin: 10px 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  details {
+    background: #16181d;
+    border: 1px solid #2a2d35;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #4fc3f7;
+    font-size: 16px;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  summary::after { content: "▼"; font-size: 12px; color: #666; }
+  details[open] summary::after { content: "▲"; }
+  .details-content { padding: 0 16px 16px; }
+  .tag {
+    display: inline-block;
+    background: #2a2d35;
+    color: #81c784;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-right: 4px;
+  }
+  .warn { color: #ff8a65; }
+  .ok { color: #81c784; }
+  .info { color: #4fc3f7; }
+  .flow-box {
+    background: #1a1d24;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 12px 0;
+    text-align: center;
+  }
+  .flow-arrow { color: #4fc3f7; font-size: 20px; margin: 4px 0; }
+  .flow-step {
+    display: inline-block;
+    background: #2a2d35;
+    padding: 6px 14px;
+    border-radius: 20px;
+    margin: 2px;
+    font-size: 14px;
+  }
+  .toc {
+    background: #16181d;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .toc a {
+    color: #4fc3f7;
+    text-decoration: none;
+    display: block;
+    padding: 4px 0;
+    font-size: 14px;
+  }
+  .toc a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<h1>《我要当国王》开发复盘手册</h1>
+<p class="subtitle">Godot 4.7.2 · 2D 俯视角基地攻防 RTS · 手机优先<br>涵盖：系统设计 + 数值 + Godot 开发知识点 + 代码架构 + 踩坑经验</p>
+
+<div class="toc">
+  <strong style="color:#ffb74d;">📑 目录</strong>
+  <a href="#overview">一、游戏概述</a>
+  <a href="#loop">二、核心玩法循环</a>
+  <a href="#systems">三、系统设计详解</a>
+  <a href="#numbers">四、数值总表</a>
+  <a href="#godot">五、Godot 开发知识点</a>
+  <a href="#architecture">六、代码架构</a>
+  <a href="#debug">七、调试与踩坑经验</a>
+  <a href="#future">八、后续规划</a>
+</div>
+
+<!-- ==================== 一、游戏概述 ==================== -->
+<h2 id="overview">一、游戏概述</h2>
+<p><strong>一句话</strong>：从一无所有开始，砍树挖矿发育 → 建大本营 → 造围墙+防御塔 → 出兵营出兵 → 带兵拆掉对方大本营，当上国王。</p>
+<ul>
+  <li><span class="tag">俯视角 2D</span> 非横版，自由地图</li>
+  <li><span class="tag">手机优先</span> 虚拟摇杆 + 按钮，PC 可玩</li>
+  <li><span class="tag">单人 AI</span> AI 完全镜像玩家逻辑</li>
+  <li><span class="tag">小数值</span> 伤害个位数、血量两位数，拒绝很多 0</li>
+  <li><span class="tag">Godot 4.7.2</span> 禁用 4.4.x，显式类型声明（禁 :=）</li>
+</ul>
+
+<!-- ==================== 二、核心循环 ==================== -->
+<h2 id="loop">二、核心玩法循环</h2>
+<div class="flow-box">
+  <div class="flow-step">开局一无所有</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">砍树/挖矿（木·石·铁）</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">攒 5木5石 → 建大本营</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">建 1 防御塔 + 4 围墙</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">建兵营 → 自动出兵</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">攒 12 铁 → 升级兵营（步兵→骑兵）</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step">带兵进攻 → 拆敌方大本营</div>
+  <div class="flow-arrow">↓</div>
+  <div class="flow-step" style="background:#2e4a2e;color:#81c784;">🏆 胜利！当上国王</div>
+</div>
+
+<!-- ==================== 三、系统设计详解 ==================== -->
+<h2 id="systems">三、系统设计详解</h2>
+
+<details open>
+<summary>3.1 采集系统</summary>
+<div class="details-content">
+<h3>资源类型</h3>
+<table>
+  <tr><th>资源</th><th>血量</th><th>掉落</th><th>说明</th></tr>
+  <tr><td>木材</td><td>9</td><td>1~3/棵</td><td>砍树随机掉</td></tr>
+  <tr><td>石头</td><td>9</td><td>1~3/块</td><td>挖矿随机掉</td></tr>
+  <tr><td>铁矿</td><td>45</td><td>1/矿</td><td>血量≈木/石的5倍</td></tr>
+</table>
+<h3>采集方式</h3>
+<ul>
+  <li><strong>攻击式采集</strong>：走近资源，用剑/弓攻击即可采集（不是读条式）</li>
+  <li><strong>小兵帮采</strong>：玩家主动攻击资源时，300px 范围内己方小兵一起打</li>
+  <li><strong>资源刷新</strong>：采空后 60 秒原位刷新</li>
+  <li><strong>掉落物</strong>：掉在地上，走近自动拾取</li>
+</ul>
+<h3>关键设计决策</h3>
+<p class="warn">⚠️ 资源<strong>不加碰撞体</strong>：不挡任何人，避免资源卡住 AI/玩家行动。挖取靠距离判定（≤46px 可攻击）。</p>
+</div>
+</details>
+
+<details>
+<summary>3.2 建造系统</summary>
+<div class="details-content">
+<h3>建筑列表</h3>
+<table>
+  <tr><th>建筑</th><th>成本</th><th>血量</th><th>耗时</th><th>碰撞</th></tr>
+  <tr><td>大本营</td><td>木5+石5</td><td>80</td><td>10s</td><td>双方都挡</td></tr>
+  <tr><td>围墙</td><td>石2</td><td>20</td><td>2s</td><td>只挡敌方</td></tr>
+  <tr><td>防御塔</td><td>木4+石3</td><td>30</td><td>5s</td><td>无</td></tr>
+  <tr><td>兵营</td><td>木8+石8</td><td>30</td><td>5s</td><td>无</td></tr>
+</table>
+<h3>建造规则</h3>
+<ul>
+  <li><strong>大本营唯一</strong>：每人只能建 1 座</li>
+  <li><strong>兵营前置</strong>：必须先建好<strong>已完工</strong>的 4 围墙 + 1 防御塔</li>
+  <li><strong>大本营升级已搁置</strong>：一级即可，UI 升级按钮已移除</li>
+  <li><strong>未完工建筑</strong>：占位无效，统一 10 血，可被打断（材料部分掉落）</li>
+</ul>
+<h3>放置逻辑（泰拉瑞亚式点选）</h3>
+<ol>
+  <li>点「建造」→ 二级菜单 → 选建筑 → 进入放置模式</li>
+  <li>虚影跟随鼠标/手指，大小随建筑类型变化</li>
+  <li>玩家身边虚线小圈（放置半径 140px ≈ 4.5 身位）</li>
+  <li>虚影绿=可放、红=不可放</li>
+  <li>点一下屏幕 → 在点击位置建造</li>
+  <li>放置模式下玩家可移动，范围圈跟着走</li>
+</ol>
+<h3>拆除逻辑</h3>
+<ul>
+  <li>二级菜单「拆除」→ 点己方建筑 → 读条（围墙 1s，其他 3s）</li>
+  <li>完成 → <strong>全额返还资源</strong></li>
+  <li>限制：不能拆大本营、不能拆敌方、必须在放置范围内</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>3.3 领地系统</summary>
+<div class="details-content">
+<ul>
+  <li>以大本营为中心，初始半径 <strong>120px</strong></li>
+  <li>每完工一个建筑，半径 <strong>+40px</strong></li>
+  <li>大本营画浅绿色虚线领地圈，随建筑扩大</li>
+  <li>两家大本营开局必须保持 500px 以上距离</li>
+  <li class="info">💡 玩家放置建筑不再限制在领地内，改为限制在玩家身边放置范围。领地圈目前主要是视觉装饰 + AI 建造参考。</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>3.4 兵种系统</summary>
+<div class="details-content">
+<h3>兵种</h3>
+<table>
+  <tr><th>兵种</th><th>血量</th><th>伤害</th><th>移速</th></tr>
+  <tr><td>剑士（低阶）</td><td>12</td><td>2</td><td>220</td></tr>
+  <tr><td>骑兵（高阶）</td><td>25</td><td>4</td><td>320</td></tr>
+</table>
+<h3>出兵规则</h3>
+<ul>
+  <li>每 3 秒出 1 兵，上限 3 个/营</li>
+  <li>阵亡后每 10 秒补 1 个</li>
+  <li>升级兵营（12 铁）→ 全体变骑兵</li>
+  <li>每人最多 2 个兵营</li>
+</ul>
+<h3>小兵模式（兵营级独立）</h3>
+<ul>
+  <li><strong>驻守（默认）</strong>：兵营附近防守</li>
+  <li><strong>跟随</strong>：走近兵营（&lt;140px），兵营上方浮现按钮，点击切换</li>
+  <li>每个兵营独立切换，不是全局</li>
+  <li>死亡复活后继承死亡前的模式</li>
+</ul>
+<h3>小兵行为</h3>
+<ul>
+  <li>警戒范围：敌单位 240px、野怪 160px</li>
+  <li>帮采资源：玩家攻击资源时 300px 内小兵一起打</li>
+  <li>优先攻击最近目标</li>
+  <li>跟随时在玩家身边环内跟随，不贴脸堵路</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>3.5 战斗系统</summary>
+<div class="details-content">
+<h3>主角属性</h3>
+<table>
+  <tr><th>项</th><th>数值</th></tr>
+  <tr><td>血量</td><td>30</td></tr>
+  <tr><td>移速</td><td>300</td></tr>
+  <tr><td>剑伤（近战）</td><td>3，范围70，冷却0.6s</td></tr>
+  <tr><td>弓伤（远程）</td><td>3，射程200，冷却1s</td></tr>
+</table>
+<h3>攻击机制</h3>
+<ul>
+  <li><strong>近战/远程自动切换</strong>：离目标近用剑，远用弓，不会同时用</li>
+  <li><strong>自动索敌最近目标</strong>：敌军 &gt; 野怪 &gt; 资源（按距离）</li>
+  <li><strong>击退</strong>：近战 140、远程 60，衰减 700/s（轻微）</li>
+</ul>
+<h3>复活</h3>
+<ul>
+  <li>建家前：原地复活</li>
+  <li>建家后：回大本营复活</li>
+</ul>
+<h3>开发者模式</h3>
+<p class="warn">⚠️ 按 P 键 +500 木/石/铁（调试用，<strong>发布前必须删除</strong>）</p>
+</div>
+</details>
+
+<details>
+<summary>3.6 野怪系统</summary>
+<div class="details-content">
+<table>
+  <tr><th>类型</th><th>血量</th><th>伤害</th><th>移速</th><th>掉落</th></tr>
+  <tr><td>弱怪</td><td>9</td><td>1</td><td>130</td><td>木/石</td></tr>
+  <tr><td>强怪</td><td>45</td><td>3</td><td>160</td><td>铁</td></tr>
+</table>
+<ul>
+  <li><strong>栖息地</strong>：固定区域游荡，活动范围 120px</li>
+  <li><strong>警戒圈</strong>：半径 170px，浅绿色虚线；进入则追击</li>
+  <li><strong>脱离回巢</strong>：离开警戒圈后自动回栖息地</li>
+  <li><strong>移速比玩家慢</strong>，不会追不上</li>
+  <li><strong>攻击距离 42px</strong>（略大于碰撞体，确保能打到）</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>3.7 AI 系统</summary>
+<div class="details-content">
+<h3>核心原则</h3>
+<p>AI <strong>完全镜像玩家逻辑</strong>：采集 → 建家 → 1塔 → 4墙 → 2兵营 → 攒铁升级 → 出兵进攻。</p>
+<h3>决策状态机</h3>
+<ul>
+  <li>每帧决定当前动作（采集/建造/升级/进攻）</li>
+  <li><strong>采集优先</strong>：资源不够时持续采集，攒够才回基地建（不会来回空转）</li>
+  <li><strong>严格建造顺序</strong>：塔 → 墙 → 兵营，按前置条件</li>
+  <li><strong>塔墙完工才建兵营</strong>：未完工则回基地等待</li>
+  <li><strong>建造失败冷却</strong>：找不到空地时采集 5 秒后重试</li>
+</ul>
+<h3>关键修复记录</h3>
+<p class="warn">⚠️ <strong>AI 来回空转 bug</strong>：早期 AI 资源不够时只采集 2.5 秒就冲回基地试建，不够又去采，反复切换。修复：改为「攒够才回基地建，不够就一直采」。</p>
+<p class="warn">⚠️ <strong>AI 建不出兵营 bug</strong>：早期 AI 统计建筑数只算已完工，墙未完工时就冲去建兵营被拒→反复失败。修复：统计含建造中，且塔墙完工后才建兵营。</p>
+</div>
+</details>
+
+<details>
+<summary>3.8 碰撞体系（重点）</summary>
+<div class="details-content">
+<h3>碰撞层分配</h3>
+<table>
+  <tr><th>层位</th><th>值</th><th>实体</th></tr>
+  <tr><td>bit 1</td><td>1</td><td>大本营（通用障碍）</td></tr>
+  <tr><td>bit 2</td><td>2</td><td>我方单位</td></tr>
+  <tr><td>bit 3</td><td>4</td><td>敌方单位</td></tr>
+  <tr><td>bit 4</td><td>8</td><td>资源（无碰撞体）</td></tr>
+  <tr><td>bit 5</td><td>16</td><td>野怪</td></tr>
+  <tr><td>bit 6</td><td>32</td><td>我方围墙（只挡敌方）</td></tr>
+  <tr><td>bit 7</td><td>64</td><td>敌方围墙（只挡我方）</td></tr>
+</table>
+<h3>掩码规则</h3>
+<table>
+  <tr><th>实体</th><th>掩码</th><th>阻挡</th></tr>
+  <tr><td>我方单位</td><td>85</td><td>大本营+敌方单位+野怪+敌方围墙</td></tr>
+  <tr><td>敌方单位</td><td>51</td><td>大本营+我方单位+野怪+我方围墙</td></tr>
+  <tr><td>我方箭</td><td>85</td><td>命中敌方单位+大本营+野怪+敌方围墙</td></tr>
+  <tr><td>敌方箭</td><td>51</td><td>命中我方单位+大本营+野怪+我方围墙</td></tr>
+  <tr><td>掉落物</td><td>6</td><td>拾取：玩家层+敌层</td></tr>
+</table>
+<h3>核心规则</h3>
+<ul>
+  <li class="ok">✅ 资源无碰撞体 → 不挡任何人</li>
+  <li class="ok">✅ 同队不碰撞 → 小兵不挡自己人</li>
+  <li class="ok">✅ 敌我互撞 → 小兵挡敌人</li>
+  <li class="ok">✅ 围墙分阵营 → 自己人可穿，敌人被挡</li>
+  <li class="ok">✅ 塔/兵营无碰撞体 → 双方可穿行</li>
+  <li class="ok">✅ 大本营双方都挡</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>3.9 节奏与胜负</summary>
+<div class="details-content">
+<ul>
+  <li>对局约 6~8 分钟，<strong>8 分钟时间兜底</strong>（比大本营血量）</li>
+  <li><strong>加速机制</strong>：8 分钟后每 1 分钟小兵属性 +15%，主角不变</li>
+  <li>胜负：摧毁敌方大本营 = 胜利</li>
+  <li>结算界面：胜负 + 「再来一局」</li>
+</ul>
+</div>
+</details>
+
+<!-- ==================== 四、数值总表 ==================== -->
+<h2 id="numbers">四、数值总表</h2>
+<table>
+  <tr><th>类别</th><th>项</th><th>数值</th></tr>
+  <tr><td rowspan="4">主角</td><td>血量</td><td>30</td></tr>
+  <tr><td>移速</td><td>300</td></tr>
+  <tr><td>剑伤</td><td>3（范围70，冷却0.6s）</td></tr>
+  <tr><td>弓伤</td><td>3（射程200，冷却1s）</td></tr>
+  <tr><td rowspan="3">资源</td><td>木/石血量</td><td>9</td></tr>
+  <tr><td>铁矿血量</td><td>45</td></tr>
+  <tr><td>刷新时间</td><td>60s</td></tr>
+  <tr><td rowspan="2">野怪</td><td>弱怪</td><td>HP9 伤1 速130</td></tr>
+  <tr><td>强怪</td><td>HP45 伤3 速160</td></tr>
+  <tr><td rowspan="2">兵种</td><td>剑士</td><td>HP12 伤2 速220</td></tr>
+  <tr><td>骑兵</td><td>HP25 伤4 速320</td></tr>
+  <tr><td rowspan="4">建筑</td><td>大本营</td><td>HP80，木5+石5，10s</td></tr>
+  <tr><td>围墙</td><td>HP20，石2，2s</td></tr>
+  <tr><td>防御塔</td><td>HP30，木4+石3，5s，射程240</td></tr>
+  <tr><td>兵营</td><td>HP30，木8+石8，5s</td></tr>
+  <tr><td>升级</td><td>兵营升骑兵</td><td>铁12，10s</td></tr>
+  <tr><td rowspan="2">拆除</td><td>围墙</td><td>1s</td></tr>
+  <tr><td>其他</td><td>3s</td></tr>
+  <tr><td>放置范围</td><td>玩家身边</td><td>140px（≈4.5身位）</td></tr>
+  <tr><td>领地</td><td>初始/每建筑</td><td>120px / +40px</td></tr>
+</table>
+
+<!-- ==================== 五、Godot 开发知识点 ==================== -->
+<h2 id="godot">五、Godot 开发知识点</h2>
+
+<details open>
+<summary>5.1 碰撞层与掩码（Collision Layer/Mask）</summary>
+<div class="details-content">
+<h3>核心概念</h3>
+<ul>
+  <li><strong>collision_layer（碰撞层）</strong>：我「在」哪一层。用位掩码表示，可同时在多层。</li>
+  <li><strong>collision_mask（碰撞掩码）</strong>：我「能撞到」哪些层。同样是位掩码。</li>
+  <li>两个物体 A 和 B 能碰撞，当且仅当：<strong>A 的 layer 与 B 的 mask 有交集</strong>，且 <strong>B 的 layer 与 A 的 mask 有交集</strong>。</li>
+</ul>
+<h3>位运算速查</h3>
+<pre><code>第1位 = 1 (2^0)
+第2位 = 2 (2^1)
+第3位 = 4 (2^2)
+第4位 = 8 (2^3)
+第5位 = 16 (2^4)
+第6位 = 32 (2^5)
+第7位 = 64 (2^6)
+
+# 组合用加法或按位或
+mask = 1 + 4 + 16 + 64   # = 85
+mask = 1 | 4 | 16 | 64   # 同上</code></pre>
+<h3>本项目的实战应用</h3>
+<p>围墙分阵营只挡敌方，就是通过给「我方墙」和「敌方墙」分配不同层（32/64），然后调整单位掩码实现的：</p>
+<pre><code># 我方单位掩码 = 大本营(1) + 敌方单位(4) + 野怪(16) + 敌方围墙(64) = 85
+# 不含我方围墙(32) → 我方单位不被自己墙挡
+collision_mask = 85
+
+# 敌方单位掩码 = 大本营(1) + 我方单位(2) + 野怪(16) + 我方围墙(32) = 51
+# 不含敌方围墙(64) → 敌方单位不被自己墙挡
+collision_mask = 51</code></pre>
+<h3>常见坑</h3>
+<ul>
+  <li class="warn">⚠️ 忘记设置 mask → 物体不与任何东西碰撞（穿墙）</li>
+  <li class="warn">⚠️ 两个同层物体 mask 都不含自己层 → 同队不碰撞（这是我们想要的）</li>
+  <li class="warn">⚠️ Area2D 的 mask 决定它能「检测到」哪些层的 body</li>
+  <li class="warn">⚠️ 资源不加碰撞体时，即使 layer 设了也没用（没有 CollisionShape2D）</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>5.2 状态机（State Machine）</summary>
+<div class="details-content">
+<h3>应用场景</h3>
+<ul>
+  <li><strong>AI 决策</strong>：采集/建造/升级/进攻 四种状态，每帧切换</li>
+  <li><strong>建筑生命周期</strong>：建造中 → 已完工 → 升级中 → 拆除中 → 销毁</li>
+  <li><strong>小兵模式</strong>：驻守/跟随</li>
+</ul>
+<h3>简单状态机写法</h3>
+<pre><code># 用变量表示当前状态
+var state: String = "idle"
+
+func _process(delta: float) -> void:
+    match state:
+        "idle":
+            _do_idle(delta)
+        "gather":
+            _do_gather(delta)
+        "build":
+            _do_build(delta)
+        "attack":
+            _do_attack(delta)
+
+# 切换状态时做清理
+func change_state(new_state: String) -> void:
+    state = new_state
+    match new_state:
+        "gather": gather_target = null
+        "build": build_timer = 0.0</code></pre>
+<h3>本项目 AI 状态机的关键教训</h3>
+<p class="warn">⚠️ <strong>状态切换太频繁 = 来回空转</strong>：早期 AI 在「采集」和「建造」之间每 2.5 秒切换一次，导致走到资源前又回基地。修复：资源不够时<strong>锁定在采集状态</strong>，攒够才切换到建造。</p>
+<p class="info">💡 原则：状态切换要有「足够的理由」，不要基于短计时器频繁切换。用「条件满足才切换」代替「定时切换」。</p>
+</div>
+</details>
+
+<details>
+<summary>5.3 信号（Signal）与组（Group）</summary>
+<div class="details-content">
+<h3>信号（Signal）</h3>
+<ul>
+  <li>Godot 的观察者模式：一个节点发出信号，其他节点连接并响应</li>
+  <li>内置信号：<code>body_entered</code>（Area2D 检测到物理体）、<code>pressed</code>（按钮点击）、<code>tree_entered</code> 等</li>
+  <li>自定义信号：<code>signal my_signal(arg1, arg2)</code></li>
+</ul>
+<pre><code># 定义信号
+signal destroyed(team: int, type: String)
+
+# 发出信号
+destroyed.emit(team, btype)
+
+# 连接信号
+body_entered.connect(_on_body_entered)
+button.pressed.connect(func() -> void: print("clicked"))</code></pre>
+<h3>组（Group）</h3>
+<ul>
+  <li>给节点打标签，方便批量查找和操作</li>
+  <li><code>add_to_group("building")</code> 加入组</li>
+  <li><code>get_tree().get_nodes_in_group("building")</code> 获取组内所有节点</li>
+</ul>
+<pre><code># 本项目的组
+"building"    # 所有建筑
+"minion"      # 所有小兵
+"wild"        # 所有野怪
+"team0"       # 玩家方（玩家+小兵+建筑）
+"team1"       # 敌方（AI+小兵+建筑）
+"resource_node"  # 所有资源点
+"projectile"  # 所有箭矢</code></pre>
+<h3>实战技巧</h3>
+<ul>
+  <li>用组做<strong>阵营区分</strong>：<code>is_in_group("team0")</code> 判断敌我</li>
+  <li>用组做<strong>批量遍历</strong>：找最近敌人时遍历 <code>get_nodes_in_group("team1")</code></li>
+  <li>注意：<code>get_nodes_in_group</code> 返回的是数组，遍历时如果节点可能被销毁，要先检查 <code>is_instance_valid()</code></li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>5.4 场景树与节点</summary>
+<div class="details-content">
+<h3>核心概念</h3>
+<ul>
+  <li>Godot 一切都是节点（Node），节点组成场景树</li>
+  <li><code>add_child(node)</code> 添加子节点，<code>remove_child(node)</code> 移除</li>
+  <li><code>queue_free()</code> 安全销毁节点（在当前帧结束后销毁，避免遍历中销毁导致崩溃）</li>
+  <li><code>get_tree()</code> 获取场景树根，<code>get_tree().current_scene</code> 获取当前场景</li>
+</ul>
+<h3>动态创建节点</h3>
+<pre><code># 创建建筑
+var b: Building = Building.new()
+b.name = "Building_wall_001"
+b.setup(self, team, type, pos)
+add_child(b)
+
+# 销毁（安全方式）
+b.queue_free()
+
+# 检查节点是否还有效（可能已被销毁）
+if is_instance_valid(b):
+    b.do_something()</code></pre>
+<h3>常见坑</h3>
+<ul>
+  <li class="warn">⚠️ 遍历组时销毁节点 → 用 <code>queue_free()</code> 而不是 <code>free()</code>，且遍历前拷贝数组</li>
+  <li class="warn">⚠️ 节点已销毁还访问其属性 → 用 <code>is_instance_valid()</code> 检查</li>
+  <li class="warn">⚠️ <code>get_node("path")</code> 路径写错 → 优先用变量引用或 <code>@onready</code></li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>5.5 输入处理（鼠标/触摸）</summary>
+<div class="details-content">
+<h3>三种输入方式</h3>
+<ol>
+  <li><strong>_input(event)</strong>：全局输入，最先收到，适合放置/拆除等全局交互</li>
+  <li><strong>_unhandled_input(event)</strong>：未被 UI 消费的输入，适合游戏操作</li>
+  <li><strong>_gui_input(event)</strong>：Control 节点的输入，适合按钮/UI</li>
+</ol>
+<h3>鼠标事件</h3>
+<pre><code>func _input(event: InputEvent) -> void:
+    # 鼠标移动
+    if event is InputEventMouseMotion:
+        var mm: InputEventMouseMotion = event as InputEventMouseMotion
+        print("鼠标位置: ", mm.position)
+
+    # 鼠标按键
+    elif event is InputEventMouseButton:
+        var mb: InputEventMouseButton = event as InputEventMouseButton
+        if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+            print("左键按下")
+
+    # 触摸（手机）
+    elif event is InputEventScreenTouch:
+        var t: InputEventScreenTouch = event as InputEventScreenTouch
+        if t.pressed:
+            print("触摸位置: ", t.position)
+
+    # 触摸拖动
+    elif event is InputEventScreenDrag:
+        var d: InputEventScreenDrag = event as InputEventScreenDrag
+        print("拖动位置: ", d.position)</code></pre>
+<h3>屏幕坐标 → 世界坐标</h3>
+<pre><code># CanvasLayer 中，屏幕坐标转世界坐标
+func _screen_to_world(screen_pos: Vector2) -> Vector2:
+    return get_viewport().get_canvas_transform().affine_inverse() * screen_pos
+
+# Node2D 中可以直接用
+var world_pos: Vector2 = get_global_mouse_position()</code></pre>
+<h3>本项目放置模式的输入设计</h3>
+<ul>
+  <li>鼠标/手指移动 → 更新虚影位置（<code>mouse_world</code>）</li>
+  <li>左键/触摸按下 → 检查是否点在 UI 按钮上，不是则放置/拆除</li>
+  <li>放置模式下左半屏摇杆照常工作（<code>_is_left_zone</code> 判断）</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>5.6 CanvasLayer 与 HUD</summary>
+<div class="details-content">
+<h3>CanvasLayer</h3>
+<ul>
+  <li>独立于游戏世界的渲染层，UI 不随相机移动</li>
+  <li><code>extends CanvasLayer</code>，所有子节点都在屏幕空间</li>
+  <li>本项目 HUD 就是一个 CanvasLayer，包含资源条、计时、建造按钮、摇杆等</li>
+</ul>
+<h3>动态创建 UI</h3>
+<pre><code># 创建按钮
+var btn: Button = Button.new()
+btn.text = "建造"
+btn.position = Vector2(100, 100)
+btn.size = Vector2(120, 50)
+btn.pressed.connect(_on_build_clicked)
+add_child(btn)
+
+# 创建标签
+var label: Label = Label.new()
+label.text = "木0 石0 铁0"
+label.add_theme_font_size_override("font_size", 22)
+add_child(label)</code></pre>
+<h3>UI 层级管理</h3>
+<ul>
+  <li>后添加的节点在上层（渲染顺序）</li>
+  <li>用 <code>visible = false</code> 隐藏面板，而不是销毁（避免重复创建）</li>
+  <li>建造菜单用二级结构：默认收起，点开展开，避免 UI 拥挤</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>5.7 _draw 自定义绘制</summary>
+<div class="details-content">
+<h3>核心方法</h3>
+<ul>
+  <li><code>_draw()</code>：Node2D 的虚函数，每帧重绘时调用</li>
+  <li><code>queue_redraw()</code>：请求重绘（在下一帧调用 _draw）</li>
+  <li>常用绘制函数：<code>draw_rect</code>、<code>draw_circle</code>、<code>draw_line</code>、<code>draw_string</code>、<code>draw_colored_polygon</code></li>
+</ul>
+<h3>本项目的 _draw 应用</h3>
+<pre><code># 绘制建筑（色块 + 边框）
+func _draw() -> void:
+    draw_rect(Rect2(-half, -half, half*2, half*2), color)
+    draw_rect(Rect2(-half, -half, half*2, half*2), Color(0,0,0,0.5), false, 2.0)
+
+# 绘制虚线圆（范围圈）
+func _draw_dashed_circle(pos, r, col, width, dash, gap):
+    var a: float = 0.0
+    while a < TAU:
+        var a1: float = minf(a + dash, TAU)
+        var p0: Vector2 = pos + Vector2(cos(a), sin(a)) * r
+        var p1: Vector2 = pos + Vector2(cos(a1), sin(a1)) * r
+        draw_line(p0, p1, col, width)
+        a += dash + gap
+
+# 绘制文字标签
+var font: Font = ThemeDB.fallback_font
+draw_string(font, Vector2(-24, 8), "大", HORIZONTAL_ALIGNMENT_CENTER, 48, 18, Color.WHITE)</code></pre>
+<h3>注意事项</h3>
+<ul>
+  <li class="warn">⚠️ _draw 只在节点可见时调用，且只绘制一次（需要持续更新就每帧 queue_redraw）</li>
+  <li class="warn">⚠️ 绘制坐标是节点的局部坐标，不是全局坐标</li>
+  <li class="warn">⚠️ draw_string 的字体要用 <code>ThemeDB.fallback_font</code>，否则可能不显示</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>5.8 CharacterBody2D 移动</summary>
+<div class="details-content">
+<h3>基本移动</h3>
+<pre><code>extends CharacterBody2D
+
+var speed: float = 300.0
+var velocity: Vector2 = Vector2.ZERO
+
+func _physics_process(delta: float) -> void:
+    # 获取输入
+    var input_dir: Vector2 = Vector2(
+        Input.get_axis("move_left", "move_right"),
+        Input.get_axis("move_up", "move_down")
+    ).normalized()
+
+    # 设置速度
+    velocity = input_dir * speed
+
+    # 移动并处理碰撞
+    move_and_slide()</code></pre>
+<h3>本项目的移动方式</h3>
+<ul>
+  <li>玩家/AI/小兵/野怪都用 <code>CharacterBody2D</code></li>
+  <li>手机端用虚拟摇杆：<code>external_move</code> 变量接收摇杆输入（-1~1）</li>
+  <li>AI/小兵用 <code>_move_to(target_pos)</code>：朝目标点移动，自动处理碰撞</li>
+</ul>
+<pre><code>func _move_to(target: Vector2) -> void:
+    var dir: Vector2 = (target - global_position).normalized()
+    velocity = dir * speed
+    move_and_slide()
+
+# 手机摇杆输入
+var external_move: Vector2 = Vector2.ZERO  # 由 HUD 摇杆设置
+
+func _physics_process(delta: float) -> void:
+    velocity = external_move * speed
+    move_and_slide()</code></pre>
+<h3>击退实现</h3>
+<pre><code>var knockback: Vector2 = Vector2.ZERO
+
+func _physics_process(delta: float) -> void:
+    # 击退衰减
+    knockback = knockback.move_toward(Vector2.ZERO, 700.0 * delta)
+    # 正常移动 + 击退
+    velocity = external_move * speed + knockback
+    move_and_slide()
+
+# 受到击退
+func _apply_knockback(dir: Vector2, strength: float) -> void:
+    knockback = dir.normalized() * strength</code></pre>
+</div>
+</details>
+
+<details>
+<summary>5.9 Area2D 检测</summary>
+<div class="details-content">
+<h3>Area2D vs CharacterBody2D</h3>
+<ul>
+  <li><strong>CharacterBody2D</strong>：有物理碰撞，会被挡住，适合玩家/敌人/建筑</li>
+  <li><strong>Area2D</strong>：无物理碰撞，只做检测，适合箭矢/掉落物/触发区域</li>
+</ul>
+<h3>箭矢（Area2D）</h3>
+<pre><code>extends Area2D
+
+func _ready() -> void:
+    body_entered.connect(_on_body_entered)
+
+func _on_body_entered(body: Node) -> void:
+    # 检查命中的是不是敌人
+    if body.is_in_group("team1") and body.has_method("take_damage"):
+        body.take_damage(damage, team)
+        queue_free()  # 箭消失
+
+func _physics_process(delta: float) -> void:
+    # 箭飞行
+    global_position += direction * speed * delta</code></pre>
+<h3>掉落物（Area2D）</h3>
+<pre><code>extends Area2D
+
+func _ready() -> void:
+    body_entered.connect(_on_body_entered)
+    # 掩码设为玩家层(2)+敌层(4)，只检测单位
+    collision_mask = 6
+
+func _on_body_entered(body: Node) -> void:
+    if body is Player or body is Minion:
+        # 拾取资源
+        collect()
+        queue_free()</code></pre>
+<h3>关键：mask 决定检测范围</h3>
+<p class="info">💡 Area2D 的 <code>collision_mask</code> 决定它能检测到哪些层的 body。箭矢 mask 设为敌方单位层+建筑层+野怪层，就能命中这些目标。</p>
+</div>
+</details>
+
+<!-- ==================== 六、代码架构 ==================== -->
+<h2 id="architecture">六、代码架构</h2>
+
+<details open>
+<summary>6.1 文件结构</summary>
+<div class="details-content">
+<pre><code>E:\GodotProjects\我要当国王\
+├── project.godot          # 工程配置
+├── design.md              # 设计文档
+├── README.md              # 说明
+├── icon.svg
+├── scenes\
+│   └── Main.tscn          # 主场景（挂 game.gd）
+└── scripts\
+    ├── game.gd            # 总控：世界/资源/建造/出兵/胜负/节奏
+    ├── player.gd          # 玩家：移动/攻击/采集/复活
+    ├── ai_hero.gd         # AI英雄：状态机/采集/建造/进攻
+    ├── building.gd        # 建筑：建造读条/完工/升级/拆除/塔攻击/兵营出兵
+    ├── minion.gd          # 小兵：移动/攻击/驻守跟随/帮采/骑兵
+    ├── wild_monster.gd    # 野怪：栖息地/警戒圈/追击/回巢
+    ├── resource_node.gd   # 资源点：血量/掉落/刷新（无碰撞体）
+    ├── resource_drop.gd   # 掉落物：拾取检测
+    ├── projectile.gd      # 箭矢：飞行/命中/伤害
+    ├── hud.gd             # UI：资源条/建造菜单/摇杆/放置/拆除/结算
+    ├── world.gd           # 世界：地图边界/背景
+    ├── hp_bar.gd          # 血条：受攻击显示/常显/建造读条
+    ├── melee_fx.gd        # 近战特效
+    └── build_preview.gd   # 建造预览：虚影/放置范围圈</code></pre>
+</div>
+</details>
+
+<details>
+<summary>6.2 核心类关系</summary>
+<div class="details-content">
+<ul>
+  <li><strong>GameManager（game.gd）</strong>：总控，持有所有引用（player/ai_hero/hud/preview/基地），管理资源/建造/出兵/胜负</li>
+  <li><strong>Player / AiHero</strong>：继承 CharacterBody2D，各自实现移动/攻击逻辑</li>
+  <li><strong>Building</strong>：继承 StaticBody2D，统一处理所有建筑类型（用 btype 区分）</li>
+  <li><strong>Minion</strong>：继承 CharacterBody2D，小兵行为</li>
+  <li><strong>WildMonster</strong>：继承 CharacterBody2D，野怪行为</li>
+  <li><strong>Hud</strong>：继承 CanvasLayer，所有 UI</li>
+  <li><strong>BuildPreview</strong>：继承 Node2D，放置虚影</li>
+</ul>
+<h3>通信方式</h3>
+<ul>
+  <li>GameManager → 其他：直接调用方法（<code>game.player.attack()</code>）</li>
+  <li>其他 → GameManager：通过 <code>game</code> 引用调用（<code>game.try_build()</code>）</li>
+  <li>建筑 → GameManager：信号（<code>game.on_building_finished(b)</code>）</li>
+  <li>UI → GameManager：按钮回调（<code>Callable(game, "try_build")</code>）</li>
+</ul>
+</div>
+</details>
+
+<!-- ==================== 七、调试与踩坑经验 ==================== -->
+<h2 id="debug">七、调试与踩坑经验</h2>
+
+<details open>
+<summary>7.1 AI 来回空转（最经典的 bug）</summary>
+<div class="details-content">
+<h3>症状</h3>
+<p>AI 收集远处资源时，走到资源前 → 回大本营 → 又走到资源前 → 又回大本营，永远采不到资源。</p>
+<h3>根因</h3>
+<p>AI 决策状态机在「采集」和「建造」之间频繁切换：资源不够时只采集 2.5 秒就冲回基地试建，不够又去采。地图大、资源远，每次往返路程很长，采一两下就被打断。</p>
+<h3>修复</h3>
+<p>改为「<strong>攒够才回基地建，不够就一直采</strong>」：资源不够时锁定在采集状态，直到攒够建造所需资源才切换到建造状态。</p>
+<h3>教训</h3>
+<p class="info">💡 状态切换要有「足够的理由」，不要基于短计时器频繁切换。用「条件满足才切换」代替「定时切换」。</p>
+</div>
+</details>
+
+<details>
+<summary>7.2 AI 建不出兵营</summary>
+<div class="details-content">
+<h3>症状</h3>
+<p>AI 建了塔和墙，但一直建不出兵营。</p>
+<h3>根因</h3>
+<ol>
+  <li>AI 统计建筑数只算「已完工」，建造中的墙/塔没被统计 → 反复刷同类建筑</li>
+  <li>兵营前置要求「已完工的 4 墙+1 塔」，但 AI 在墙未完工时就冲去建兵营 → 被游戏拒绝 → 反复失败空转</li>
+</ol>
+<h3>修复</h3>
+<ul>
+  <li>统计建筑数含「建造中」的总数，避免重复建同类</li>
+  <li>塔墙均完工后才建兵营，未完工则回基地等待</li>
+  <li>建造失败进 5 秒重试冷却</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>7.3 碰撞体系重做</summary>
+<div class="details-content">
+<h3>问题</h3>
+<ul>
+  <li>资源有碰撞体 → 卡住 AI/玩家行动</li>
+  <li>小兵同队碰撞 → 自己人堵路</li>
+  <li>围墙双方都挡 → 自己人回不了家</li>
+</ul>
+<h3>解决方案</h3>
+<p>重新分配碰撞层，给围墙分阵营（我方墙=层32，敌方墙=层64），调整各单位掩码：</p>
+<ul>
+  <li>资源移除碰撞体</li>
+  <li>同队单位掩码不含自己层 → 同队不碰撞</li>
+  <li>我方单位掩码含敌方墙(64)不含我方墙(32) → 过自己墙、挡敌人墙</li>
+</ul>
+<h3>教训</h3>
+<p class="info">💡 碰撞层/掩码是 Godot 2D 游戏最核心的机制之一，设计前先画好层位表，避免后期大改。</p>
+</div>
+</details>
+
+<details>
+<summary>7.4 弓箭穿模（命中检测失败）</summary>
+<div class="details-content">
+<h3>症状</h3>
+<p>弓箭直接穿过敌人，不造成伤害。</p>
+<h3>可能原因</h3>
+<ul>
+  <li>箭矢的 <code>collision_mask</code> 不含敌人所在层</li>
+  <li>敌人没有 <code>take_damage</code> 方法或不在对应组</li>
+  <li>箭矢速度太快，一帧穿过敌人（隧道效应）</li>
+</ul>
+<h3>排查方法</h3>
+<ol>
+  <li>打印箭矢的 mask 和命中的 body 信息</li>
+  <li>确认敌人的 collision_layer 是否在箭矢 mask 范围内</li>
+  <li>确认 <code>body_entered</code> 信号是否连接</li>
+</ol>
+</div>
+</details>
+
+<details>
+<summary>7.5 血条显示 bug</summary>
+<div class="details-content">
+<h3>症状</h3>
+<ul>
+  <li>野怪受攻击后血条不显示/显示后消失</li>
+  <li>敌方单位血条不显示</li>
+</ul>
+<h3>修复</h3>
+<ul>
+  <li>血条在 <code>take_damage</code> 时更新并显示</li>
+  <li>复活时也更新血条显示</li>
+  <li>敌方英雄/小兵血条设为常显（<code>always_show = true</code>）</li>
+  <li>大本营血条常显，其他单位受攻击才显示</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>7.6 验证工作流</summary>
+<div class="details-content">
+<h3>本项目的验证流程</h3>
+<ol>
+  <li><strong>暂存工程</strong>：在 <code>staging_king</code> 改代码（不影响真实工程）</li>
+  <li><strong>headless import</strong>：<code>godot --path staging --headless --import</code> 检查脚本错误</li>
+  <li><strong>冒烟测试</strong>：<code>smoke_test.gd</code> 自动运行 45 秒，写入 <code>smoke_result.txt</code>（断言 SMOKE_OK）</li>
+  <li><strong>同步真实工程</strong>：<code>Copy-Item</code> 把改好的脚本同步到 <code>E:\GodotProjects\我要当国王</code></li>
+  <li><strong>真实工程 import</strong>：再次 headless import</li>
+  <li><strong>启动 GUI</strong>：<code>Start-Process</code> 启动游戏窗口，记录 PID</li>
+</ol>
+<h3>冒烟测试断言</h3>
+<pre><code># smoke_result.txt 内容示例
+SMOKE_OK match_time=45.0 ai_builds=8 wood_ai=35 stone_ai=28 iron_ai=0</code></pre>
+<p class="info">💡 冒烟测试能快速发现脚本语法错误和运行时崩溃，但不能替代人工试玩（交互/手感/视觉问题需要人看）。</p>
+</div>
+</details>
+
+<!-- ==================== 八、后续规划 ==================== -->
+<h2 id="future">八、后续规划</h2>
+
+<details open>
+<summary>8.1 近期迭代</summary>
+<div class="details-content">
+<ul>
+  <li>⬜ 建筑放置方式优化（吸附格、更精细的预览）</li>
+  <li>⬜ AI 难度分档（简单/中等/困难）</li>
+  <li>⬜ 更多兵种/建筑/地图</li>
+  <li>⬜ 正式像素美术 + 音效</li>
+  <li>⬜ 移除 P 键开发者模式（发布前）</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>8.2 远期规划</summary>
+<div class="details-content">
+<ul>
+  <li>⬜ 联机 1v1（建房/加房，先房主托管后转官方）</li>
+  <li>⬜ 皮肤 + 段位系统</li>
+  <li>⬜ TapTap 安卓导出适配</li>
+  <li>⬜ 广告变现集成</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>8.3 代码规范备忘</summary>
+<div class="details-content">
+<ul>
+  <li class="warn">⚠️ <strong>禁用 :=</strong>：所有变量必须显式类型声明（<code>var x: int = 0</code>，不是 <code>var x := 0</code>）</li>
+  <li class="warn">⚠️ <strong>禁用 Godot 4.4.x</strong>：必须用 4.7.2</li>
+  <li class="warn">⚠️ <strong>小数值</strong>：伤害个位数、血量两位数，拒绝很多 0</li>
+  <li class="warn">⚠️ <strong>改不确定点前先问用户</strong>：不要闭门造车</li>
+  <li class="warn">⚠️ <strong>AI 的 toast 不弹给玩家</strong>：按阵营过滤提示</li>
+  <li class="warn">⚠️ <strong>资源图片必须透明</strong>：导入时确保透明背景</li>
+</ul>
+</div>
+</details>
+
+<div style="text-align:center; margin-top:40px; padding:20px; color:#666; font-size:13px; border-top:1px solid #2a2d35;">
+  《我要当国王》开发复盘手册 · Godot 4.7.2<br>
+  最后更新：2026-10-14
+</div>
+
+</body>
+</html>
